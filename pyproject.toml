@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dxo-client"
+version = "1.4.5"
+description = "Python client for workflow-knowledge service"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "tacjlee", email = "tacjlee@gmail.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "httpx>=0.25.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+consul = ["python-consul>=1.1.0"]
+celery = ["celery>=5.3.0", "redis>=4.0.0"]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-httpx>=0.21.0",
+    "celery>=5.3.0",
+    "redis>=4.0.0",
+]
+all = [
+    "python-consul>=1.1.0",
+    "celery>=5.3.0",
+    "redis>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/tacjlee/dxo-client"
+Repository = "https://github.com/tacjlee/dxo-client.git"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dxo_client*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
