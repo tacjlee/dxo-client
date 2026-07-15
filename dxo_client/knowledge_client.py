@@ -770,7 +770,8 @@ class KnowledgeClient:
         top_k: int = 10,
         filters: Optional[MetadataFilter] = None,
         score_threshold: Optional[float] = None,
-        include_embeddings: bool = False
+        include_embeddings: bool = False,
+        search_type: Optional[str] = None
     ) -> List[SearchResult]:
         """
         Search for documents using semantic similarity.
@@ -782,6 +783,10 @@ class KnowledgeClient:
             filters: Metadata filters
             score_threshold: Minimum similarity score (0-1)
             include_embeddings: Include embeddings in results
+            search_type: Search mode - "auto" (default routing), "bm25"
+                (pure lexical), or "hybrid_rrf" (dense + sparse + bm25
+                fused with RRF). Requires dxo-knowledge with BM25 support;
+                omit for legacy behavior.
 
         Returns:
             List of SearchResult
@@ -796,6 +801,8 @@ class KnowledgeClient:
             request_data["filters"] = filters.to_dict() if hasattr(filters, 'to_dict') else filters
         if score_threshold is not None:
             request_data["score_threshold"] = score_threshold
+        if search_type is not None:
+            request_data["search_type"] = search_type
 
         data = self._make_request("POST", "/api/knowledge/search", json=request_data)
         return [SearchResult(**r) for r in data.get("results", [])]
@@ -864,7 +871,8 @@ class KnowledgeClient:
         top_k: int = 5,
         filters: Optional[MetadataFilter] = None,
         rerank: bool = False,
-        rerank_top_n: int = 3
+        rerank_top_n: int = 3,
+        search_type: Optional[str] = None
     ) -> RAGContext:
         """
         RAG retrieval: get relevant chunks for a query.
@@ -880,6 +888,9 @@ class KnowledgeClient:
             filters: Metadata filters
             rerank: Deprecated - ignored (ColBERT reranking is automatic)
             rerank_top_n: Deprecated - ignored
+            search_type: Search mode - "auto", "bm25", or "hybrid_rrf".
+                Requires dxo-knowledge with BM25 support; omit for legacy
+                behavior.
 
         Returns:
             RAGContext with chunks and combined context
@@ -893,6 +904,8 @@ class KnowledgeClient:
         }
         if filters:
             request_data["filters"] = filters.to_dict() if hasattr(filters, 'to_dict') else filters
+        if search_type is not None:
+            request_data["search_type"] = search_type
 
         data = self._make_request("POST", "/api/knowledge/search/rag", json=request_data)
 
@@ -1001,7 +1014,8 @@ class KnowledgeClient:
         filters: Optional[MetadataFilter] = None,
         score_threshold: Optional[float] = None,
         include_children: bool = False,
-        score_aggregation: str = "mean"
+        score_aggregation: str = "mean",
+        search_type: Optional[str] = None
     ) -> SearchExpandResult:
         """
         Search for parent documents by querying child chunks.
@@ -1026,6 +1040,9 @@ class KnowledgeClient:
                 - "mean": Average of matching child scores (default, better relevance)
                 - "max": Maximum child score (legacy behavior)
                 - "sum": Sum of matching child scores (favors more matches)
+            search_type: Search mode - "auto", "bm25", or "hybrid_rrf".
+                Requires dxo-knowledge with BM25 support; omit for legacy
+                behavior.
 
         Returns:
             SearchExpandResult with parent documents and their content
@@ -1054,6 +1071,8 @@ class KnowledgeClient:
             request_data["filters"] = filters.to_dict() if hasattr(filters, 'to_dict') else filters
         if score_threshold is not None:
             request_data["score_threshold"] = score_threshold
+        if search_type is not None:
+            request_data["search_type"] = search_type
 
         data = self._make_request("POST", "/api/knowledge/search/parent", json=request_data)
 

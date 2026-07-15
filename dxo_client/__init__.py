@@ -124,7 +124,7 @@ except ImportError:
     CeleryTimeoutError = None
     CeleryTaskError = None
 
-__version__ = "1.4.5"
+__version__ = "1.4.6"
 
 # Graph Knowledge Client SDK
 # Import with: from dxo_client import GraphKnowledgeClient

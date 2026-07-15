@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dxo-client"
-version = "1.4.5"
+version = "1.4.6"
 description = "Python client for workflow-knowledge service"
 readme = "README.md"
 requires-python = ">=3.9"
