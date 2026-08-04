@@ -67,7 +67,6 @@ from .models import (
     BatchSimilarityResponse,
 )
 from .exceptions import (
-    # New names
     KnowledgeError,
     KnowledgeConnectionError,
     KnowledgeTimeoutError,
@@ -75,14 +74,6 @@ from .exceptions import (
     KnowledgeNotFoundError,
     KnowledgeValidationError,
     KnowledgeCircuitBreakerError,
-    # Backwards compatibility aliases (deprecated)
-    KnowledgeBaseError,
-    KnowledgeBaseConnectionError,
-    KnowledgeBaseTimeoutError,
-    KnowledgeBaseAPIError,
-    KnowledgeBaseNotFoundError,
-    KnowledgeBaseValidationError,
-    KnowledgeBaseCircuitBreakerError,
 )
 
 # Consul Client SDK (optional - requires python-consul)
@@ -124,7 +115,7 @@ except ImportError:
     CeleryTimeoutError = None
     CeleryTaskError = None
 
-__version__ = "1.4.6"
+__version__ = "1.5.0"
 
 # Graph Knowledge Client SDK
 # Import with: from dxo_client import GraphKnowledgeClient
@@ -136,6 +127,25 @@ from .graph_knowledge_client import (
     GraphKnowledgeTimeoutError,
     GraphKnowledgeAPIError,
     GraphKnowledgeNotFoundError,
+)
+
+# Search Knowledge Client SDK (dxo-search-knowledge service)
+# Import with: from dxo_client import SearchKnowledgeClient
+from .search_knowledge_client import (
+    SearchKnowledgeClient,
+    get_search_knowledge_client,
+    SearchKnowledgeError,
+    SearchKnowledgeConnectionError,
+    SearchKnowledgeTimeoutError,
+    SearchKnowledgeAPIError,
+    SearchKnowledgeNotFoundError,
+)
+
+from .models.search_knowledge import (
+    SearchChunk,
+    IngestChunksResult,
+    SearchHit,
+    SearchQueryResult,
 )
 
 from .models.graph_knowledge import (
@@ -202,14 +212,6 @@ __all__ = [
     "KnowledgeNotFoundError",
     "KnowledgeValidationError",
     "KnowledgeCircuitBreakerError",
-    # Knowledge Exceptions (deprecated aliases)
-    "KnowledgeBaseError",
-    "KnowledgeBaseConnectionError",
-    "KnowledgeBaseTimeoutError",
-    "KnowledgeBaseAPIError",
-    "KnowledgeBaseNotFoundError",
-    "KnowledgeBaseValidationError",
-    "KnowledgeBaseCircuitBreakerError",
     # Consul Client
     "ConsulClient",
     "consul_client",
@@ -251,6 +253,20 @@ __all__ = [
     "GraphKnowledgeTimeoutError",
     "GraphKnowledgeAPIError",
     "GraphKnowledgeNotFoundError",
+    # Search Knowledge Client
+    "SearchKnowledgeClient",
+    "get_search_knowledge_client",
+    # Search Knowledge Models
+    "SearchChunk",
+    "IngestChunksResult",
+    "SearchHit",
+    "SearchQueryResult",
+    # Search Knowledge Exceptions
+    "SearchKnowledgeError",
+    "SearchKnowledgeConnectionError",
+    "SearchKnowledgeTimeoutError",
+    "SearchKnowledgeAPIError",
+    "SearchKnowledgeNotFoundError",
     # Golden File Parser
     "parse_golden_file",
     "parse_golden_directory",

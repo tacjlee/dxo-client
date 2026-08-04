@@ -31,6 +31,14 @@ from .knowledge import (
     SearchRecordsResponse,
 )
 
+# Search Knowledge Models (dxo-search-knowledge service)
+from .search_knowledge import (
+    SearchChunk,
+    IngestChunksResult,
+    SearchHit,
+    SearchQueryResult,
+)
+
 __all__ = [
     # Knowledge Client Models
     "MetadataFilter",
@@ -56,4 +64,9 @@ __all__ = [
     # Search Records API Models
     "RecordMatch",
     "SearchRecordsResponse",
+    # Search Knowledge Models
+    "SearchChunk",
+    "IngestChunksResult",
+    "SearchHit",
+    "SearchQueryResult",
 ]

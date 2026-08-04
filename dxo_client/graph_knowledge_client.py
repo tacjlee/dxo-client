@@ -1,7 +1,7 @@
 """
 GraphKnowledgeClient
 
-Synchronous HTTP client for workflow-graph-knowledge service.
+Synchronous HTTP client for dxo-graph-knowledge service.
 Provides generic graph operations for any FalkorDB-backed graph.
 
 Usage:
@@ -20,6 +20,11 @@ Usage:
 
     # Get stats
     stats = client.get_stats()
+
+Multi-tenant:
+    # Target a specific graph; all requests carry the X-Graph-Name header.
+    # Omit graph_name to use the service's default graph.
+    client = GraphKnowledgeClient(graph_name="pja_knowledge")
 """
 
 import os
@@ -102,19 +107,31 @@ def retry_with_backoff(max_retries: int = 3, base_delay: float = 0.5):
 
 class GraphKnowledgeClient:
     """
-    Synchronous HTTP client for workflow-graph-knowledge service.
+    Synchronous HTTP client for dxo-graph-knowledge service.
 
     Features:
     - Generic node/relationship CRUD operations
     - Cypher query execution
+    - Per-graph addressing via graph_name (see below)
     - Connection pooling
     - Retry with exponential backoff
     - Request interceptors
+
+    Graph addressing:
+        This service stores each graph as a separate FalkorDB (Redis) key. The
+        unit of isolation is the *graph*, addressed by its raw name via the
+        X-Graph-Name header — not a "tenant". The dxo-knowledge-pipeline
+        convention names one graph per tenant as f"kb_{tenant}" (e.g.
+        "kb_test-diemlai"); that mapping lives in the caller, not this client.
+        graph_name may be set once on the client (default for every call) and/or
+        overridden per call. Omit it to use the service's configured default
+        graph.
     """
 
     def __init__(
         self,
         base_url: Optional[str] = None,
+        graph_name: Optional[str] = None,
         read_timeout: float = 30.0,
         connect_timeout: float = 10.0,
         max_retries: int = 3,
@@ -125,12 +142,19 @@ class GraphKnowledgeClient:
 
         Args:
             base_url: Service URL (default: from GRAPH_KNOWLEDGE_SERVICE_URL env or http://localhost:8006)
+            graph_name: Default FalkorDB graph name (the raw graph, e.g.
+                "kb_test-diemlai"), sent as the X-Graph-Name header on every
+                request unless overridden per call (default: from
+                GRAPH_KNOWLEDGE_GRAPH_NAME env, else None -> the service's
+                configured default graph)
             read_timeout: Read timeout in seconds (default: 30)
             connect_timeout: Connection timeout in seconds (default: 10)
             max_retries: Maximum retry attempts
-            interceptors: List of request interceptors
+            interceptors: List of request interceptors (applied after the
+                X-Graph-Name header, so an interceptor can still override it)
         """
         self._base_url = base_url or _get_config("GRAPH_KNOWLEDGE_SERVICE_URL", "http://localhost:8006")
+        self._graph_name = graph_name or _get_config("GRAPH_KNOWLEDGE_GRAPH_NAME", "") or None
         self._timeout = httpx.Timeout(read_timeout, connect=connect_timeout)
         self._max_retries = max_retries
         self._client: Optional[httpx.Client] = None
@@ -180,13 +204,17 @@ class GraphKnowledgeClient:
         method: str,
         endpoint: str,
         json: Optional[Dict] = None,
-        params: Optional[Dict] = None
+        params: Optional[Dict] = None,
+        graph_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Make HTTP request with error handling."""
         try:
             client = self._get_client()
 
             headers = {"Content-Type": "application/json"}
+            effective_graph = graph_name or self._graph_name
+            if effective_graph:
+                headers["X-Graph-Name"] = effective_graph
             headers = self._apply_interceptors(headers)
 
             response = client.request(
@@ -238,6 +266,7 @@ class GraphKnowledgeClient:
         label: str,
         node_id: str,
         properties: Dict[str, Any] = None,
+        graph_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Create or merge a node.
@@ -246,6 +275,7 @@ class GraphKnowledgeClient:
             label: Node label (e.g., "Viewpoint", "TestCase")
             node_id: Unique identifier
             properties: Additional properties
+            graph_name: Override the client's default graph for this call
 
         Returns:
             Created node data
@@ -258,18 +288,21 @@ class GraphKnowledgeClient:
                 "id": node_id,
                 "properties": properties or {},
             },
+            graph_name=graph_name,
         )
 
     @retry_with_backoff(max_retries=3)
     def create_nodes_bulk(
         self,
         nodes: List[Dict[str, Any]],
+        graph_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Bulk create nodes.
 
         Args:
             nodes: List of {"label": str, "id": str, "properties": dict}
+            graph_name: Override the client's default graph for this call
 
         Returns:
             {"created": int, "errors": list}
@@ -278,6 +311,7 @@ class GraphKnowledgeClient:
             "POST",
             "/api/v1/graph/nodes/bulk",
             json={"nodes": nodes},
+            graph_name=graph_name,
         )
 
     @retry_with_backoff(max_retries=3)
@@ -286,6 +320,7 @@ class GraphKnowledgeClient:
         label: str,
         node_id: str,
         properties: Dict[str, Any] = None,
+        graph_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Merge a node (create if not exists, update if exists).
@@ -296,6 +331,7 @@ class GraphKnowledgeClient:
             label: Node label (e.g., "FlowPattern", "FlowState")
             node_id: Unique identifier
             properties: Additional properties
+            graph_name: Override the client's default graph for this call
 
         Returns:
             Merged node data
@@ -308,13 +344,18 @@ class GraphKnowledgeClient:
                 "id": node_id,
                 "properties": properties or {},
             },
+            graph_name=graph_name,
         )
 
     @retry_with_backoff(max_retries=3)
-    def get_node(self, label: str, node_id: str) -> Optional[Dict[str, Any]]:
-        """Get a node by label and ID."""
+    def get_node(
+        self, label: str, node_id: str, graph_name: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Get a node by label and ID (graph_name overrides the default graph)."""
         try:
-            return self._request("GET", f"/api/v1/graph/nodes/{label}/{node_id}")
+            return self._request(
+                "GET", f"/api/v1/graph/nodes/{label}/{node_id}", graph_name=graph_name
+            )
         except GraphKnowledgeNotFoundError:
             return None
 
@@ -324,27 +365,35 @@ class GraphKnowledgeClient:
         label: str,
         limit: int = 100,
         offset: int = 0,
+        graph_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """List nodes by label."""
+        """List nodes by label (graph_name overrides the default graph)."""
         return self._request(
             "GET",
             f"/api/v1/graph/nodes/{label}",
             params={"limit": limit, "offset": offset},
+            graph_name=graph_name,
         )
 
     @retry_with_backoff(max_retries=3)
-    def delete_node(self, label: str, node_id: str) -> bool:
-        """Delete a node and its relationships."""
+    def delete_node(
+        self, label: str, node_id: str, graph_name: Optional[str] = None
+    ) -> bool:
+        """Delete a node and its relationships (graph_name overrides the default graph)."""
         try:
-            self._request("DELETE", f"/api/v1/graph/nodes/{label}/{node_id}")
+            self._request(
+                "DELETE", f"/api/v1/graph/nodes/{label}/{node_id}", graph_name=graph_name
+            )
             return True
         except GraphKnowledgeNotFoundError:
             return False
 
     @retry_with_backoff(max_retries=3)
-    def delete_all_nodes(self, label: str) -> int:
-        """Delete all nodes with a given label."""
-        result = self._request("DELETE", f"/api/v1/graph/nodes/{label}")
+    def delete_all_nodes(self, label: str, graph_name: Optional[str] = None) -> int:
+        """Delete all nodes with a given label (graph_name overrides the default graph)."""
+        result = self._request(
+            "DELETE", f"/api/v1/graph/nodes/{label}", graph_name=graph_name
+        )
         return result.get("deleted", 0)
 
     # =========================================================================
@@ -360,6 +409,7 @@ class GraphKnowledgeClient:
         to_id: str,
         rel_type: str,
         properties: Dict[str, Any] = None,
+        graph_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Create a relationship between two nodes.
@@ -371,6 +421,7 @@ class GraphKnowledgeClient:
             to_id: Target node ID
             rel_type: Relationship type (e.g., "TESTS", "BELONGS_TO")
             properties: Additional properties
+            graph_name: Override the client's default graph for this call
 
         Returns:
             Created relationship data
@@ -386,18 +437,21 @@ class GraphKnowledgeClient:
                 "type": rel_type,
                 "properties": properties or {},
             },
+            graph_name=graph_name,
         )
 
     @retry_with_backoff(max_retries=3)
     def create_relationships_bulk(
         self,
         relationships: List[Dict[str, Any]],
+        graph_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Bulk create relationships.
 
         Args:
             relationships: List of relationship dicts
+            graph_name: Override the client's default graph for this call
 
         Returns:
             {"created": int, "errors": list}
@@ -406,6 +460,7 @@ class GraphKnowledgeClient:
             "POST",
             "/api/v1/graph/relationships/bulk",
             json={"relationships": relationships},
+            graph_name=graph_name,
         )
 
     @retry_with_backoff(max_retries=3)
@@ -417,6 +472,7 @@ class GraphKnowledgeClient:
         to_id: str,
         rel_type: str,
         properties: Dict[str, Any] = None,
+        graph_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Merge a relationship (create if not exists, idempotent).
@@ -430,6 +486,7 @@ class GraphKnowledgeClient:
             to_id: Target node ID
             rel_type: Relationship type (e.g., "HAS_STATE", "HAS_ACTION")
             properties: Additional properties
+            graph_name: Override the client's default graph for this call
 
         Returns:
             Merged relationship data
@@ -445,6 +502,7 @@ class GraphKnowledgeClient:
                 "type": rel_type,
                 "properties": properties or {},
             },
+            graph_name=graph_name,
         )
 
     # =========================================================================
@@ -456,6 +514,7 @@ class GraphKnowledgeClient:
         self,
         cypher: str,
         parameters: Dict[str, Any] = None,
+        graph_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Execute a Cypher query.
@@ -463,9 +522,10 @@ class GraphKnowledgeClient:
         Args:
             cypher: The Cypher query
             parameters: Query parameters
+            graph_name: Override the client's default graph for this call
 
         Returns:
-            {"columns": list, "rows": list, "stats": dict}
+            {"success": bool, "data": list, "rows": list}  (on error: success=False, "error": str)
         """
         return self._request(
             "POST",
@@ -474,6 +534,7 @@ class GraphKnowledgeClient:
                 "cypher": cypher,
                 "parameters": parameters or {},
             },
+            graph_name=graph_name,
         )
 
     # =========================================================================
@@ -481,26 +542,29 @@ class GraphKnowledgeClient:
     # =========================================================================
 
     @retry_with_backoff(max_retries=3)
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self, graph_name: Optional[str] = None) -> Dict[str, Any]:
         """
-        Get graph statistics.
+        Get graph statistics (graph_name overrides the default graph).
 
         Returns:
             {"graph_name": str, "total_nodes": int, "total_relationships": int, ...}
         """
-        return self._request("GET", "/api/v1/graph/stats")
+        return self._request("GET", "/api/v1/graph/stats", graph_name=graph_name)
 
     # =========================================================================
     # INDEX OPERATIONS
     # =========================================================================
 
     @retry_with_backoff(max_retries=3)
-    def create_index(self, label: str, property: str) -> Dict[str, Any]:
-        """Create an index on a node label and property."""
+    def create_index(
+        self, label: str, property: str, graph_name: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Create an index on a node label and property (graph_name overrides the default graph)."""
         return self._request(
             "POST",
             "/api/v1/graph/indexes",
             json={"label": label, "property": property},
+            graph_name=graph_name,
         )
 
     # =========================================================================
@@ -508,12 +572,15 @@ class GraphKnowledgeClient:
     # =========================================================================
 
     @retry_with_backoff(max_retries=3)
-    def delete_all(self, confirm: bool = False) -> Dict[str, Any]:
-        """Delete all data from the graph. Requires confirm=True."""
+    def delete_all(
+        self, confirm: bool = False, graph_name: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Delete all data from the graph. Requires confirm=True (graph_name overrides the default graph)."""
         return self._request(
             "DELETE",
             "/api/v1/graph/all",
             params={"confirm": confirm},
+            graph_name=graph_name,
         )
 
 

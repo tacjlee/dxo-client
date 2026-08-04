@@ -42,13 +42,3 @@ class KnowledgeValidationError(KnowledgeError):
 class KnowledgeCircuitBreakerError(KnowledgeError):
     """Raised when circuit breaker is open."""
     pass
-
-
-# Backwards compatibility aliases (deprecated)
-KnowledgeBaseError = KnowledgeError
-KnowledgeBaseConnectionError = KnowledgeConnectionError
-KnowledgeBaseTimeoutError = KnowledgeTimeoutError
-KnowledgeBaseAPIError = KnowledgeAPIError
-KnowledgeBaseNotFoundError = KnowledgeNotFoundError
-KnowledgeBaseValidationError = KnowledgeValidationError
-KnowledgeBaseCircuitBreakerError = KnowledgeCircuitBreakerError
