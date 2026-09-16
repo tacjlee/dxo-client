@@ -332,6 +332,35 @@ class KnowledgeClient:
         return CollectionInfo(**data)
 
     @retry_with_backoff(max_retries=3)
+    def create_payload_index(
+        self,
+        collection_name: str,
+        field_name: str,
+        field_schema: str = "keyword",
+    ) -> Dict[str, Any]:
+        """Create a payload index on a collection field so filtering on it uses
+        the index instead of a full scan. Idempotent — safe to call repeatedly.
+
+        Every collection already has a `tenant_id` keyword index; use this to
+        index your service's own frequently-filtered payload keys (e.g. status,
+        folder).
+
+        Args:
+            collection_name: Target collection
+            field_name: Payload field to index
+            field_schema: Index type — keyword (default), integer, float, bool,
+                text, datetime, uuid, geo
+
+        Returns:
+            Dict with collection_name, field_name, field_schema, created
+        """
+        return self._make_request(
+            "POST",
+            f"/api/knowledge/collections/{collection_name}/indexes",
+            json={"field_name": field_name, "field_schema": field_schema},
+        )
+
+    @retry_with_backoff(max_retries=3)
     def get_collection_info(self, collection_name: str) -> CollectionInfo:
         """Get collection information."""
         data = self._make_request("GET", f"/api/knowledge/collections/{collection_name}")

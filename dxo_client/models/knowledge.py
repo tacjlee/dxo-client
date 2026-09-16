@@ -15,6 +15,7 @@ class MetadataFilter(BaseModel):
     Hierarchy: tenant_id -> knowledge_id -> document_id
     """
     tenant_id: Optional[str] = None
+    tenant_ids: Optional[List[str]] = None  # Filter by multiple tenants (cross-tenant search)
     knowledge_id: Optional[str] = None
     knowledge_ids: Optional[List[str]] = None  # Filter by multiple knowledge bases
     document_id: Optional[str] = None
@@ -30,7 +31,9 @@ class MetadataFilter(BaseModel):
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dict, excluding None values."""
         result = {}
-        if self.tenant_id:
+        if self.tenant_ids:
+            result["tenant_ids"] = self.tenant_ids
+        elif self.tenant_id:
             result["tenant_id"] = self.tenant_id
         if self.knowledge_ids:
             result["knowledge_ids"] = self.knowledge_ids

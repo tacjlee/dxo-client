@@ -5,16 +5,19 @@ Python client for `workflow-knowledge` service. Provides a FeignClient-like inte
 ## Installation
 
 ```bash
-# From GitHub
-pip install "git+https://github.com/tacjlee/dxo-client.git"
+# From NTT GitLab (internal, source of truth)
+pip install "git+https://gitlab.ntte-moi.com/dxo/dxo-client.git"
+
+# Pin a branch or tag
+pip install "git+https://gitlab.ntte-moi.com/dxo/dxo-client.git@develop"
 
 # With Consul support
-pip install "dxo-client[consul] @ git+https://github.com/tacjlee/dxo-client.git"
+pip install "dxo-client[consul] @ git+https://gitlab.ntte-moi.com/dxo/dxo-client.git"
 ```
 
 **In requirements.txt:**
 ```
-dxo-client @ git+https://github.com/tacjlee/dxo-client.git
+dxo-client @ git+https://gitlab.ntte-moi.com/dxo/dxo-client.git
 ```
 
 ## Quick Start
@@ -159,6 +162,59 @@ context = client.rag_retrieval(
 embeddings = client.generate_embeddings(texts, batch_size=32)
 ```
 
+## SearchKnowledgeClient (dxo-search-knowledge)
+
+Client for the `dxo-search-knowledge` hybrid search service (semantic + BM25 → RRF → rerank).
+Push-API pattern: chunking happens on your side, the service only embeds + indexes.
+
+```python
+from dxo_client import SearchKnowledgeClient
+
+# tenant_id is sent as the X-Tenant-ID header on every request
+client = SearchKnowledgeClient(
+    base_url="http://localhost:8080",  # or SEARCH_KNOWLEDGE_SERVICE_URL env
+    tenant_id="tenant-123",
+)
+
+# Index pre-cut chunks (idempotent when chunk_id is omitted)
+result = client.ingest_chunks(
+    doc_id="doc-001",
+    chunks=[
+        {"text": "Điều khoản bảo hành 12 tháng...", "metadata": {"section": "bảo hành"}},
+        "Plain strings work too",
+    ],
+    metadata={"file_name": "policy.pdf"},  # document-level, merged into every chunk
+)
+print(result.chunks_indexed, result.chunk_ids)
+
+# Hybrid search
+response = client.search(
+    "thời hạn bảo hành",
+    top_k=5,
+    filters={"section": "bảo hành"},   # list value = match ANY, "doc_id" filters by document
+    # retrievers=["semantic"],         # optional subset; default = all enabled
+)
+for hit in response.hits:
+    print(hit.score, hit.source, hit.text)
+
+# RAG shortcut: joined hit texts
+context = client.rag_retrieval("thời hạn bảo hành", top_k=5)
+
+# Delete a document (all of its chunks)
+client.delete_document("doc-001")
+
+# Introspection
+client.health_check()       # {"service": ..., "status": "ok"}
+client.readiness_check()    # {"qdrant": true, "cache": true, "status": "ready"}
+client.list_strategies()    # available/enabled retrievers + fusion strategies
+```
+
+**Environment variables**: `SEARCH_KNOWLEDGE_SERVICE_URL` (default `http://localhost:8080`),
+`SEARCH_KNOWLEDGE_TENANT_ID` (default tenant). Both also resolve via Consul when available.
+
+**Errors**: `SearchKnowledgeConnectionError`, `SearchKnowledgeTimeoutError`,
+`SearchKnowledgeNotFoundError`, `SearchKnowledgeAPIError` (all subclass `SearchKnowledgeError`).
+
 ## Error Handling
 
 ```python
@@ -184,8 +240,6 @@ except KnowledgeValidationError:
 except KnowledgeAPIError as e:
     print(e.status_code, e.response_body)
 ```
-
-> **Backwards Compatibility**: The old `KnowledgeBase*` exception names are still available as aliases but deprecated.
 
 ## Testing
 
