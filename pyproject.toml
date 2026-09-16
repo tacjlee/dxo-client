@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dxo-client"
-version = "1.5.0"
+version = "1.5.1"
 description = "Python client for workflow-knowledge service"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [
-    {name = "tacjlee", email = "tacjlee@gmail.com"}
+    {name = "DXO Team", email = "hoang.nguyen@ntte-moi.com"}
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -44,8 +44,8 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/tacjlee/dxo-client"
-Repository = "https://github.com/tacjlee/dxo-client.git"
+Homepage = "https://gitlab.ntte-moi.com/dxo/dxo-client"
+Repository = "https://gitlab.ntte-moi.com/dxo/dxo-client.git"
 
 [tool.setuptools.packages.find]
 where = ["."]
