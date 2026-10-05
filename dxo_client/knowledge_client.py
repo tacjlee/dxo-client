@@ -800,7 +800,8 @@ class KnowledgeClient:
         filters: Optional[MetadataFilter] = None,
         score_threshold: Optional[float] = None,
         include_embeddings: bool = False,
-        search_type: Optional[str] = None
+        search_type: Optional[str] = None,
+        prefetch_limit: Optional[int] = None
     ) -> List[SearchResult]:
         """
         Search for documents using semantic similarity.
@@ -816,6 +817,10 @@ class KnowledgeClient:
                 (pure lexical), or "hybrid_rrf" (dense + sparse + bm25
                 fused with RRF). Requires dxo-knowledge with BM25 support;
                 omit for legacy behavior.
+            prefetch_limit: Hybrid-search candidates to prefetch per leg
+                (dense, sparse) before fusion/rerank. Overrides the server's
+                HYBRID_PREFETCH_LIMIT for this request; omit to use the
+                server default. Only affects hybrid search modes.
 
         Returns:
             List of SearchResult
@@ -832,6 +837,8 @@ class KnowledgeClient:
             request_data["score_threshold"] = score_threshold
         if search_type is not None:
             request_data["search_type"] = search_type
+        if prefetch_limit is not None:
+            request_data["prefetch_limit"] = prefetch_limit
 
         data = self._make_request("POST", "/api/knowledge/search", json=request_data)
         return [SearchResult(**r) for r in data.get("results", [])]
